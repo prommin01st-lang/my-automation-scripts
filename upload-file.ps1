@@ -6,6 +6,7 @@ param (
     [string]$BaseUrl = "http://context-nexus.runasp.net",
     [string]$ApiKey = $env:CONTEXT_NEXUS_API_KEY
 )
+# test
 
 # Force UTF-8 Encoding for Console Output
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
