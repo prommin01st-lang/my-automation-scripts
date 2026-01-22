@@ -1,6 +1,5 @@
 param (
     [string]$ProjectName,
-
     [string]$BaseUrl = "http://context-nexus.runasp.net",
     [string]$ApiKey = $env:CONTEXT_NEXUS_API_KEY
 )
@@ -8,48 +7,48 @@ param (
 # Force UTF-8 Encoding for Console Output
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-if ([string]::IsNullOrWhiteSpace($ApiKey)) {
-    Write-Error "Error: API Key is missing!`nPlease set environment variable 'CONTEXT_NEXUS_API_KEY' or pass '-ApiKey' parameter."
-    exit 1
-}
-
-$url = "$BaseUrl/api/Context/projects"
-$headers = @{
-    "x-api-key" = $ApiKey
-    "Content-Type" = "application/json"
-}
-
-# 1. Fetch and show existing projects
-Write-Host "`nExisting Projects:" -ForegroundColor Yellow
 try {
-    $existing = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
-    if ($existing.Count -gt 0) {
-        $existing | ForEach-Object { Write-Host " - $($_.name)" -ForegroundColor Gray }
-    } else {
-        Write-Host " (None)" -ForegroundColor Gray
+    if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+        throw "API Key is missing! Please set environment variable 'CONTEXT_NEXUS_API_KEY' or pass '-ApiKey' parameter."
     }
-} catch {
-    Write-Warning "Could not fetch existing projects."
-}
 
-# 2. Prompt if ProjectName wasn't provided as argument
-if ([string]::IsNullOrWhiteSpace($ProjectName)) {
-    $ProjectName = Read-Host "`nEnter name for new project"
-}
+    $url = "$BaseUrl/api/Context/projects"
+    $headers = @{
+        "x-api-key" = $ApiKey
+        "Content-Type" = "application/json"
+    }
 
-if ([string]::IsNullOrWhiteSpace($ProjectName)) {
-    Write-Error "ProjectName is required."
-    exit 1
-}
+    # 1. Fetch and show existing projects
+    Write-Host "`nExisting Projects:" -ForegroundColor Yellow
+    try {
+        $existing = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
+        if ($existing.Count -gt 0) {
+            $existing | ForEach-Object { Write-Host " - $($_.name)" -ForegroundColor Gray }
+        } else {
+            Write-Host " (None)" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Warning "Could not fetch existing projects."
+    }
 
-$body = @{ name = $ProjectName } | ConvertTo-Json
+    # 2. Prompt if ProjectName wasn't provided as argument
+    if ([string]::IsNullOrWhiteSpace($ProjectName)) {
+        $ProjectName = Read-Host "`nEnter name for new project"
+    }
 
-Write-Host "`nCreating project: $ProjectName..." -ForegroundColor Cyan
+    if ([string]::IsNullOrWhiteSpace($ProjectName)) {
+        throw "ProjectName is required."
+    }
 
-try {
-    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Post -Body $body
-    Write-Host "Project created successfully!" -ForegroundColor Green
+    $body = @{ name = $ProjectName } | ConvertTo-Json
+
+    Write-Host "`nCreating project: $ProjectName..." -ForegroundColor Cyan
+
+    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Post -Body $body -ErrorAction Stop
+    Write-Host "✅ Project created successfully!" -ForegroundColor Green
     $response | ConvertTo-Json
+
 } catch {
-    Write-Error "Failed to create project: $_"
+    Write-Host "`n❌ Error: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
