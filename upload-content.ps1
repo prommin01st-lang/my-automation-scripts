@@ -7,6 +7,9 @@ param (
     [string]$ApiKey = $env:CONTEXT_NEXUS_API_KEY
 )
 
+# Force UTF-8 Encoding for Console Output
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
     Write-Error "Error: API Key is missing!`nPlease set environment variable 'CONTEXT_NEXUS_API_KEY' or pass '-ApiKey' parameter."
     exit 1
@@ -23,7 +26,7 @@ try {
     $projectsUrl = "$BaseUrl/api/Context/projects"
     $existingProjects = Invoke-RestMethod -Uri $projectsUrl -Headers $headers -Method Get
     if ($existingProjects.Count -gt 0) {
-        $existingProjects | ForEach-Object { Write-Host " - $_" -ForegroundColor Gray }
+        $existingProjects | ForEach-Object { Write-Host " - $($_.name)" -ForegroundColor Gray }
     } else {
         Write-Host " (None)" -ForegroundColor Gray
     }
@@ -68,6 +71,16 @@ if ([string]::IsNullOrWhiteSpace($FilePath) -or [string]::IsNullOrWhiteSpace($Co
     exit 1
 }
 
+# 5. Safety Check: Rename restricted extensions to .txt
+$RestrictedExtensions = @(".config", ".exe", ".dll", ".bin", ".msi", ".php", ".jsp", ".asp", ".aspx", ".sh", ".bat")
+$currentExtension = [System.IO.Path]::GetExtension($FilePath)
+
+if ($RestrictedExtensions -contains $currentExtension.ToLower()) {
+    $FilePath = "$FilePath.txt"
+    Write-Host "Safety Note: Renamed restricted file path to '$FilePath' for secure storage." -ForegroundColor Yellow
+}
+
+$encodedProject = [Uri]::EscapeDataString($ProjectName)
 $url = "$BaseUrl/api/Context/content"
 
 $payload = @{ 

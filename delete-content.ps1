@@ -6,6 +6,9 @@ param (
     [string]$ApiKey = $env:CONTEXT_NEXUS_API_KEY
 )
 
+# Force UTF-8 Encoding for Console Output
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
     Write-Error "Error: API Key is missing!`nPlease set environment variable 'CONTEXT_NEXUS_API_KEY' or pass '-ApiKey' parameter."
     exit 1
@@ -63,7 +66,9 @@ if ([string]::IsNullOrWhiteSpace($FilePath)) {
     exit 1
 }
 
-$url = "$BaseUrl/api/Context/$ProjectName/$FilePath"
+$encodedProject = [Uri]::EscapeDataString($ProjectName)
+$encodedPath = [Uri]::EscapeDataString($FilePath)
+$url = "$BaseUrl/api/Context/$encodedProject/$encodedPath"
 
 Write-Host "`nYou are about to delete:" -ForegroundColor Yellow
 Write-Host "  Project: $ProjectName" -ForegroundColor Cyan

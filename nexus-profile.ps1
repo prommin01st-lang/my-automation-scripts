@@ -1,8 +1,6 @@
-# Nexus Profile Setup
-# Usage: Dot-source this file in your PowerShell Profile: . "path/to/nexus-profile.ps1"
-# Or copy the contents directly to your profile.
-
+# Set your script repository base URL here (Point this to your own GitHub repo after pushing)
 $repoBase = "https://raw.githubusercontent.com/prommin01st-lang/my-automation-scripts/main"
+# Example local path for development: $repoBase = "file:///f:/GitHubProject/Dev Context Nexus/Backend/scripts/ScriptV2"
 
 Write-Host "Loading Context Nexus Cloud Tools from: $repoBase" -ForegroundColor Cyan
 
