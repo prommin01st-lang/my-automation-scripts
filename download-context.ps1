@@ -1,5 +1,5 @@
-# Download-Context.ps1 v2.5 - Ultimate "Bulletproof" Version
-# Improved error handling to prevent script exiting on typos
+# Download-Context.ps1 v2.6 - Ironclad Version
+# Prevents script exit on typos by handling errors locally within loops
 param(
     [Parameter(Mandatory=$false)]
     [string]$ProjectName,
@@ -75,20 +75,22 @@ function Select-SavePath {
 
 # --- Main Logic ---
 
-try {
-    if (-not $ApiKey) {
-        Write-Error "API Key not found! Set CONTEXT_NEXUS_API_KEY env variable."
-        exit 1
-    }
-    $headers = @{ "x-api-key" = $ApiKey }
+if (-not $ApiKey) {
+    Write-Host "❌ API Key not found! Please set CONTEXT_NEXUS_API_KEY environment variable." -ForegroundColor Red
+    pause
+    exit 1
+}
+$headers = @{ "x-api-key" = $ApiKey }
 
-    # --- PHASE 1: Project Selection (With Retry) ---
+$globalLoop = $true
+while ($globalLoop) {
+    # --- PHASE 1: Project Selection ---
     $validProjectSelected = $false
     while (-not $validProjectSelected) {
-        # Fetch projects list
         $availableProjects = @()
         try {
-            Write-Host "`nFetching projects from server..." -ForegroundColor DarkGray
+            Write-Host "`n--- Project Selection ---" -ForegroundColor Cyan
+            Write-Host "Fetching projects from server..." -ForegroundColor DarkGray
             $projectsUrl = "$BaseUrl/api/Context/projects"
             $existingProjects = Invoke-RestMethod -Uri $projectsUrl -Headers $headers -Method Get
             if ($existingProjects.Count -gt 0) {
@@ -97,61 +99,52 @@ try {
                 $availableProjects | ForEach-Object { Write-Host " - $_" -ForegroundColor Gray }
             }
         } catch {
-            Write-Warning "Could not fetch projects list. Check your connection/API Key."
+            Write-Warning "Could not fetch projects list. Check connection."
         }
 
-        # Get Project Name
         if ([string]::IsNullOrWhiteSpace($ProjectName)) {
-            $ProjectName = Read-Host "`nEnter project name (or type 'exit' to quit)"
+            $ProjectName = Read-Host "`nEnter project name (or 'exit' to quit)"
         }
 
         if ($ProjectName -eq "exit") { exit 0 }
 
-        if ([string]::IsNullOrWhiteSpace($ProjectName)) {
-            Write-Host "Project Name cannot be empty." -ForegroundColor Red
+        if ($availableProjects.Count -gt 0 -and $availableProjects -notcontains $ProjectName) {
+            Write-Host "❌ Error: Project '$ProjectName' not found!" -ForegroundColor Red
+            $ProjectName = $null 
             continue
         }
-
-        # Validation
-        if ($availableProjects.Count -gt 0 -and $availableProjects -notcontains $ProjectName) {
-            Write-Host "❌ Error: Project '$ProjectName' not found! Please check for typos." -ForegroundColor Red
-            $ProjectName = $null # Force re-prompt
-        } else {
-            $validProjectSelected = $true
-        }
+        $validProjectSelected = $true
     }
 
-    # --- PHASE 2: File Selection (With Retry) ---
+    # --- PHASE 2: File Selection ---
     $validFileSelected = $false
     while (-not $validFileSelected) {
-        # Fetch files list for the project
         $availableFiles = @()
         try {
-            Write-Host "Fetching files for project '$ProjectName'..." -ForegroundColor DarkGray
+            Write-Host "`n--- File Selection ---" -ForegroundColor Cyan
             $encodedProject = [Uri]::EscapeDataString($ProjectName)
             $filesUrl = "$BaseUrl/api/Context/$encodedProject/files"
             $existingFiles = Invoke-RestMethod -Uri $filesUrl -Headers $headers -Method Get
             
             if ($existingFiles.Count -gt 0) {
                 $availableFiles = $existingFiles.filePath
-                Write-Host "Existing files in project '$ProjectName':" -ForegroundColor Yellow
+                Write-Host "Existing files in '$ProjectName':" -ForegroundColor Yellow
                 $availableFiles | ForEach-Object { Write-Host " - $_" -ForegroundColor Gray }
             } else {
-                Write-Host "No files found in project '$ProjectName'." -ForegroundColor Yellow
-                $ProjectName = $null # Go back to project selection
+                Write-Host "No files found in '$ProjectName'." -ForegroundColor Yellow
+                $ProjectName = $null
                 $validProjectSelected = $false
-                break 
+                break # Go back to Project Selection
             }
         } catch {
-            Write-Host "❌ Error: Could not access project '$ProjectName'. It might not exist on the server." -ForegroundColor Red
+            Write-Host "❌ Error: Project '$ProjectName' inaccessible." -ForegroundColor Red
             $ProjectName = $null
             $validProjectSelected = $false
-            break # Break out to re-select project
+            break 
         }
 
-        # Get File Path
         if ([string]::IsNullOrWhiteSpace($FilePath)) {
-            $FilePath = Read-Host "`nEnter remote file path to download (or type 'back' to change project)"
+            $FilePath = Read-Host "`nEnter remote file path (or 'back' to change project)"
         }
 
         if ($FilePath -eq "back") {
@@ -161,55 +154,46 @@ try {
             break
         }
 
-        # Validation
         if ($availableFiles.Count -gt 0 -and $availableFiles -notcontains $FilePath) {
-            Write-Host "❌ Error: File '$FilePath' not found in project '$ProjectName'!" -ForegroundColor Red
-            $FilePath = $null # Force re-prompt
-        } else {
-            $validFileSelected = $true
+            Write-Host "❌ Error: File '$FilePath' not found!" -ForegroundColor Red
+            $FilePath = $null
+            continue
         }
+        $validFileSelected = $true
     }
 
     # --- PHASE 3: Download ---
     if ($validProjectSelected -and $validFileSelected) {
-        $encodedProject = [Uri]::EscapeDataString($ProjectName)
-        $encodedPath = [Uri]::EscapeDataString($FilePath)
-        $url = "$BaseUrl/api/Context/$encodedProject/$encodedPath"
-
-        Write-Host "`nFetching download URL..." -ForegroundColor Cyan
         try {
+            $encodedProject = [Uri]::EscapeDataString($ProjectName)
+            $encodedPath = [Uri]::EscapeDataString($FilePath)
+            $url = "$BaseUrl/api/Context/$encodedProject/$encodedPath"
+
+            Write-Host "`nFetching download URL..." -ForegroundColor Cyan
             $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
             
             if ($response.url) {
                 $downloadUrl = $response.url
-                Write-Host "File URL found: $downloadUrl" -ForegroundColor Cyan
-                
-                $saveChoice = 'Y'
-                if ([string]::IsNullOrWhiteSpace($SavePath)) {
-                    $saveChoice = Read-Host "`nDo you want to save this to a file? (Y/N)"
-                }
+                $saveChoice = if ([string]::IsNullOrWhiteSpace($SavePath)) { Read-Host "`nSave to file? (Y/N)" } else { 'Y' }
 
-                if ($saveChoice -eq 'Y' -or $saveChoice -eq 'y') {
+                if ($saveChoice -match 'y|Y') {
                     $suggestedFileName = Split-Path $FilePath -Leaf
                     $finalPath = if ([string]::IsNullOrWhiteSpace($SavePath)) { Select-SavePath -FileName $suggestedFileName } else { if (Test-Path -Path $SavePath -PathType Container) { Join-Path $SavePath $suggestedFileName } else { $SavePath } }
 
                     if (Confirm-DirectoryWritable -Path $finalPath) {
-                        Write-Host "Downloading to: $finalPath" -ForegroundColor Green
                         Invoke-WebRequest -Uri $downloadUrl -OutFile $finalPath -ErrorAction Stop
                         Write-Host "✅ Download successful!" -ForegroundColor Green
-                    } else {
-                        Write-Error "Cannot write to path: $finalPath"
                     }
                 } else {
                     $resp = Invoke-WebRequest -Uri $downloadUrl -UseBasicParsing
                     Write-Host "`n--- Content ---`n$([System.Text.Encoding]::UTF8.GetString($resp.Content))`n---------------" -ForegroundColor Yellow
                 }
             }
+            $globalLoop = $false # Finish successfully
         } catch {
-            Write-Host "❌ Error: Failed to fetch download URL. The server might be down or the path is invalid." -ForegroundColor Red
+            Write-Host "❌ Download failed: $($_.Exception.Message)" -ForegroundColor Red
+            $FilePath = $null
+            # Stay in global loop to allow retry
         }
     }
-
-} catch {
-    Write-Host "`n❌ Unexpected Error: $($_.Exception.Message)" -ForegroundColor Red
 }
