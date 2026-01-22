@@ -6,21 +6,25 @@ param (
 # Force UTF-8 Encoding for Console Output
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-if ([string]::IsNullOrWhiteSpace($ApiKey)) {
-    Write-Error "Error: API Key is missing!`nPlease set environment variable 'CONTEXT_NEXUS_API_KEY' or pass '-ApiKey' parameter."
-    exit 1
-}
-
-$url = "$BaseUrl/api/Context/projects"
-$headers = @{
-    "x-api-key" = $ApiKey
-}
-
-Write-Host "Fetching project list..." -ForegroundColor Cyan
-
 try {
-    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get
-    $response | Select-Object -Property Id, Name | Format-Table -AutoSize
+    if ([string]::IsNullOrWhiteSpace($ApiKey)) {
+        throw "API Key is missing! Please set environment variable 'CONTEXT_NEXUS_API_KEY' or pass '-ApiKey' parameter."
+    }
+
+    $url = "$BaseUrl/api/Context/projects"
+    $headers = @{ "x-api-key" = $ApiKey }
+
+    Write-Host "Fetching project list..." -ForegroundColor Cyan
+
+    $response = Invoke-RestMethod -Uri $url -Headers $headers -Method Get -ErrorAction Stop
+    
+    if ($response -and $response.Count -gt 0) {
+        $response | Select-Object -Property Id, Name | Format-Table -AutoSize
+    } else {
+        Write-Host "✅ No projects found." -ForegroundColor Green
+    }
+
 } catch {
-    Write-Error "Failed to fetch projects: $_"
+    Write-Host "`n❌ Error: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
 }
