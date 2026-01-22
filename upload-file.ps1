@@ -12,6 +12,9 @@ if ([string]::IsNullOrWhiteSpace($ApiKey)) {
     exit 1
 }
 
+# Ensure System.Net.Http is loaded for Windows PowerShell 5.1
+Add-Type -AssemblyName System.Net.Http
+
 $headers = @{
     "x-api-key" = $ApiKey
     "Content-Type" = "application/json; charset=utf-8"
