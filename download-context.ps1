@@ -157,8 +157,11 @@ while ($globalLoop) {
         if ($availableFiles.Count -gt 0 -and $availableFiles -notcontains $FilePath) {
             Write-Host "❌ Error: File '$FilePath' not found!" -ForegroundColor Red
             $FilePath = $null
+            # ไม่ต้อง reset project หรือออกลูป ให้ user กรอกใหม่
             continue
+
         }
+
         $validFileSelected = $true
     }
 
@@ -196,4 +199,5 @@ while ($globalLoop) {
             # Stay in global loop to allow retry
         }
     }
+
 }
