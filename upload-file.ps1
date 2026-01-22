@@ -3,7 +3,7 @@ param (
     [string]$LocalFile,
     
     [string]$RemotePath = "",
-    [string]$BaseUrl = "https://context-nexus-production.up.railway.app",
+    [string]$BaseUrl = "http://context-nexus.runasp.net",
     [string]$ApiKey = $env:CONTEXT_NEXUS_API_KEY
 )
 
