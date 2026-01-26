@@ -26,8 +26,6 @@ try {
     try {
         $projectsUrl = "$BaseUrl/api/Context/projects"
         $existingProjects = Invoke-RestMethod -Uri $projectsUrl -Headers $listHeaders -Method Get
-        Write-Host "DEBUG: API Response:" -ForegroundColor Magenta
-        $existingProjects | ConvertTo-Json -Depth 5 | Write-Host
     } catch {
         Write-Warning "Could not fetch existing projects. Proceeding without live validation."
     }
@@ -60,11 +58,23 @@ try {
     }
 
     # 3. Loop until a valid LocalFile is provided
-    while (-not (Test-Path $LocalFile -PathType Leaf)) {
-        if ($LocalFile) { # Avoid showing error on first run when param is just empty
-            Write-Host "❌ Error: File not found at '$LocalFile'." -ForegroundColor Red
+    while ($true) {
+        # Prompt for input if the variable is currently empty.
+        # This allows passing the parameter directly or entering it interactively.
+        if ([string]::IsNullOrWhiteSpace($LocalFile)) {
+            $LocalFile = Read-Host "`nEnter local file path to upload"
         }
-        $LocalFile = Read-Host "`nEnter local file path to upload"
+
+        # After getting input, check if the file exists.
+        if (Test-Path $LocalFile -PathType Leaf) {
+            break # File found, exit the loop.
+        }
+        else {
+            # If the file doesn't exist, show an error and clear the variable
+            # to ensure the user is prompted again in the next loop iteration.
+            Write-Host "❌ Error: File not found at '$LocalFile'. Please provide a valid path." -ForegroundColor Red
+            $LocalFile = $null
+        }
     }
     # 4. Determine Remote Path
     if ([string]::IsNullOrWhiteSpace($RemotePath)) {
