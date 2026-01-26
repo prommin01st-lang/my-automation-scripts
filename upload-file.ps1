@@ -26,6 +26,8 @@ try {
     try {
         $projectsUrl = "$BaseUrl/api/Context/projects"
         $existingProjects = Invoke-RestMethod -Uri $projectsUrl -Headers $listHeaders -Method Get
+        Write-Host "DEBUG: API Response:" -ForegroundColor Magenta
+        $existingProjects | ConvertTo-Json -Depth 5 | Write-Host
     } catch {
         Write-Warning "Could not fetch existing projects. Proceeding without live validation."
     }
